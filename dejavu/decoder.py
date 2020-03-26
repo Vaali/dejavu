@@ -7,6 +7,8 @@ from pydub.utils import audioop
 from . import wavio
 from hashlib import sha1
 from six.moves import range
+from pydub.utils import make_chunks
+from config import ChunksTime,NumberOfChannels
 
 
 def unique_hash(filepath, blocksize=2**20):
@@ -52,12 +54,10 @@ def read(filename, limit=None):
     # pydub does not support 24-bit wav files, use wavio when this occurs
     try:
         audiofile = AudioSegment.from_file(filename)
-
         if limit:
             audiofile = audiofile[:limit * 1000]
 
         data = np.fromstring(audiofile._data, np.int16)
-
         channels = []
         for chn in range(audiofile.channels):
             channels.append(data[chn::audiofile.channels])
@@ -77,6 +77,50 @@ def read(filename, limit=None):
             channels.append(chn)
 
     return channels, audiofile.frame_rate
+
+
+def read_chunks(filename, limit=None):
+    """
+    Reads any file supported by pydub (ffmpeg) and returns the data contained
+    within. If file reading fails due to input being a 24-bit wav file,
+    wavio is used as a backup.
+
+    Can be optionally limited to a certain amount of seconds from the start
+    of the file by specifying the `limit` parameter. This is the amount of
+    seconds from the start of the file.
+
+    returns: (channels, samplerate)
+    """
+    # pydub does not support 24-bit wav files, use wavio when this occurs
+    try:
+        audiofile = AudioSegment.from_file(filename)
+        audiofile = audiofile.set_channels(NumberOfChannels)
+        chunk_length_ms = ChunksTime
+        chunks = make_chunks(audiofile, chunk_length_ms)
+        if limit:
+            audiofile = audiofile[:limit * 1000]
+        chunks_channels = []
+        for chunk in chunks:
+            data = np.fromstring(chunk._data, np.int16)
+            channels = []
+            for chn in range(audiofile.channels):
+                channels.append(data[chn::audiofile.channels])
+            chunks_channels.append(channels)
+            fs = audiofile.frame_rate
+    except audioop.error:
+        fs, _, audiofile = wavio.readwav(filename)
+
+        if limit:
+            audiofile = audiofile[:limit * 1000]
+
+        audiofile = audiofile.T
+        audiofile = audiofile.astype(np.int16)
+
+        channels = []
+        for chn in audiofile:
+            channels.append(chn)
+
+    return chunks_channels, audiofile.frame_rate
 
 
 def path_to_songname(path):

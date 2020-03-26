@@ -8,6 +8,7 @@ import multiprocessing
 import os
 import traceback
 import sys
+from config import IsChunks
 
 from dejavu.database import Database
 from six.moves import range
@@ -156,6 +157,8 @@ class Dejavu(object):
 
     def recognize(self, recognizer, *options, **kwoptions):
         r = recognizer(self)
+        if(IsChunks == 1):
+            return r.recognize_chunks(*options, **kwoptions)
         return r.recognize(*options, **kwoptions)
 
 

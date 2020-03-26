@@ -5,6 +5,14 @@ import numpy as np
 import pyaudio
 import time
 from six.moves import range
+from six.moves import zip
+
+import concurrent.futures
+import logging
+import traceback
+import sys
+
+logger = logging.getLogger(__name__)
 
 
 class BaseRecognizer(object):
@@ -15,11 +23,14 @@ class BaseRecognizer(object):
     def _recognize(self, *data):
         matches = []
         for d in data:
-            matches.extend(self.dejavu.find_matches(d, Fs=self.Fs))
+            matches.extend(self.dejavu.find_matches(d, Fs=self.Fs)) 
         return self.dejavu.align_matches(matches)
 
     def recognize(self):
         pass  # base class does nothing
+    
+    def recognize_chunks(self, filename):
+        pass
 
 
 class FileRecognizer(BaseRecognizer):
@@ -35,11 +46,28 @@ class FileRecognizer(BaseRecognizer):
 
         if match:
             match['match_time'] = t
-
         return match
+
+    def recognize_chunks(self, filename):
+        frames, self.Fs = decoder.read_chunks(filename, self.dejavu.limit)
+        chunk_matches = []
+        t = time.time()
+        for f in frames:
+            match = self._recognize(*f)
+            print(match)
+            chunk_matches.extend(match)
+        t = time.time() - t
+
+        #if match:
+        #    match['match_time'] = t
+        return chunk_matches
+    
 
     def recognize(self, filename):
         return self.recognize_file(filename)
+    
+    def find_fingerprint_matches(self, worker_input):
+        return self.dejavu.find_matches(worker_input[0], worker_input[1])
 
 
 class MicrophoneRecognizer(BaseRecognizer):
