@@ -11,6 +11,7 @@ import concurrent.futures
 import logging
 import traceback
 import sys
+from config import ChunksTime
 
 logger = logging.getLogger(__name__)
 
@@ -52,10 +53,11 @@ class FileRecognizer(BaseRecognizer):
         frames, self.Fs = decoder.read_chunks(filename, self.dejavu.limit)
         chunk_matches = []
         t = time.time()
-        for f in frames:
-            match = self._recognize(*f)
-            print(match)
-            chunk_matches.extend(match)
+        for i, val in enumerate(frames):
+            match = self._recognize(*val)
+            match['segment_id'] = i
+            match['start_time'] = i*ChunksTime/1000
+            chunk_matches.append(match)
         t = time.time() - t
 
         #if match:
